@@ -13,36 +13,34 @@ components:
           type: object
           description: |
             Specify the infrastructure information for deploying.
-
-            Examples:
-            ```
-            infrastructure:
-              resource_group: string             # the resource group name where to deploy the MySQL Flexible Server
-              virtual_network: string            # the virtual network name where to deploy the MySQL Flexible Server
-              subnet: string                     # the subnet name under the virtual network where to deploy the MySQL Flexible Server
-              domain_suffix: string, optional    # a private DNS namespace of the PrivateZone where to register the applied MySQL service. It must end with 'mysql.database.azure.com'
-            ```
+          default: {}
           required:
           - resource_group
-          - subnet
-          - virtual_network
           properties:
             domain_suffix:
+              description: |
+                Specify the domain suffix of the PrivateZone. The domain suffix must be a valid DNS name.
               title: Domain Suffix
               type: string
               x-walrus-ui:
                 order: 4
             resource_group:
+              description: |
+                Specify the resource group where the MySQL service applies. If not specified, a new resource group will be created.
               title: Resource Group
               type: string
               x-walrus-ui:
                 order: 1
             subnet:
+              description: |
+                Specify the subnet where the MySQL service applies. If not specified, a new subnet will be created.
               title: Subnet
               type: string
               x-walrus-ui:
                 order: 3
             virtual_network:
+              description: |
+                Specify the virtual network where the MySQL service applies. If not specified, a new virtual network and subnet will be created.
               title: Virtual Network
               type: string
               x-walrus-ui:

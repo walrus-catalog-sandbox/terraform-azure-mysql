@@ -23,11 +23,52 @@ locals {
   architecture = coalesce(var.architecture, "standalone")
 }
 
+
+# create resource group.
+
+resource "azurerm_resource_group" "default" {
+  count = var.infrastructure.resource_group == null ? 1 : 0
+
+  name     = "default"
+  location = "eastus"
+}
+
+# create virtual network.
+
+resource "azurerm_virtual_network" "default" {
+  count = var.infrastructure.virtual_network == null ? 1 : 0
+
+  name                = "default"
+  resource_group_name = data.azurerm_resource_group.selected.name
+  location            = data.azurerm_resource_group.selected.location
+  address_space       = ["10.0.0.0/16"]
+}
+
+# create subnet.
+
+resource "azurerm_subnet" "default" {
+  count = var.infrastructure.subnet == null || var.infrastructure.virtual_network == null ? 1 : 0
+
+  name                 = "default"
+  resource_group_name  = data.azurerm_resource_group.selected.name
+  virtual_network_name = data.azurerm_virtual_network.selected.name
+  address_prefixes     = ["10.0.1.0/24"]
+
+  delegation {
+    name = "delegation"
+
+    service_delegation {
+      name    = "Microsoft.DBforMySQL/flexibleServers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+}
+
 #
 # Ensure
 #
 data "azurerm_resource_group" "selected" {
-  name = var.infrastructure.resource_group
+  name = var.infrastructure.resource_group != null ? var.infrastructure.resource_group : azurerm_resource_group.default[0].name
 
   lifecycle {
     postcondition {
@@ -38,7 +79,7 @@ data "azurerm_resource_group" "selected" {
 }
 
 data "azurerm_virtual_network" "selected" {
-  name                = var.infrastructure.virtual_network
+  name                = var.infrastructure.virtual_network != null ? var.infrastructure.virtual_network : azurerm_virtual_network.default[0].name
   resource_group_name = data.azurerm_resource_group.selected.name
 
   lifecycle {
@@ -50,7 +91,7 @@ data "azurerm_virtual_network" "selected" {
 }
 
 data "azurerm_subnet" "selected" {
-  name = var.infrastructure.subnet
+  name = var.infrastructure.subnet != null && var.infrastructure.virtual_network != null ? var.infrastructure.subnet : azurerm_subnet.default[0].name
 
   virtual_network_name = data.azurerm_virtual_network.selected.name
   resource_group_name  = data.azurerm_resource_group.selected.name
