@@ -63,6 +63,26 @@ resource "azurerm_subnet" "default" {
   }
 }
 
+# create private dns.
+
+resource "azurerm_private_dns_zone" "default" {
+  count = var.infrastructure.domain_suffix == null || var.infrastructure.resource_group == null ? 1 : 0
+
+  name                = "default.mysql.database.azure.com"
+  resource_group_name = data.azurerm_resource_group.selected.name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "default" {
+  count = var.infrastructure.domain_suffix == null || var.infrastructure.resource_group == null ? 1 : 0
+
+  name                  = "default_virtual_network_link"
+  private_dns_zone_name = data.azurerm_private_dns_zone.selected.name
+  virtual_network_id    = data.azurerm_virtual_network.selected.id
+  resource_group_name   = data.azurerm_resource_group.selected.name
+
+  depends_on = [data.azurerm_subnet.selected]
+}
+
 #
 # Ensure
 #
@@ -104,9 +124,7 @@ data "azurerm_subnet" "selected" {
 }
 
 data "azurerm_private_dns_zone" "selected" {
-  count = var.infrastructure.domain_suffix == null ? 0 : 1
-
-  name                = var.infrastructure.domain_suffix
+  name                = var.infrastructure.domain_suffix == null ? azurerm_private_dns_zone.default[0].name : var.infrastructure.domain_suffix
   resource_group_name = data.azurerm_resource_group.selected.name
 
   lifecycle {
@@ -170,7 +188,7 @@ resource "azurerm_mysql_flexible_server" "primary" {
   backup_retention_days = 7
 
   delegated_subnet_id = data.azurerm_subnet.selected.id
-  private_dns_zone_id = var.infrastructure.domain_suffix == null ? null : element(data.azurerm_private_dns_zone.selected, 0).id
+  private_dns_zone_id = data.azurerm_private_dns_zone.selected.id
   sku_name            = var.resources.class
 
   version = local.version
@@ -185,6 +203,8 @@ resource "azurerm_mysql_flexible_server" "primary" {
       administrator_password,
     ]
   }
+
+  depends_on = [azurerm_private_dns_zone_virtual_network_link.default]
 }
 
 resource "azurerm_mysql_flexible_server" "secondary" {
@@ -202,7 +222,7 @@ resource "azurerm_mysql_flexible_server" "secondary" {
   backup_retention_days = 7
 
   delegated_subnet_id = data.azurerm_subnet.selected.id
-  private_dns_zone_id = var.infrastructure.domain_suffix == null ? null : element(data.azurerm_private_dns_zone.selected, 0).id
+  private_dns_zone_id = data.azurerm_private_dns_zone.selected.id
   sku_name            = var.resources.class
 
   version = local.version
@@ -221,6 +241,7 @@ resource "azurerm_mysql_flexible_server" "secondary" {
     ]
   }
 
+  depends_on = [azurerm_private_dns_zone_virtual_network_link.default]
 }
 
 # create database.
