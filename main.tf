@@ -8,7 +8,7 @@ locals {
 
   namespace = join("-", [local.project_name, local.environment_name])
   tags = {
-    "Name" = local.resource_name
+    "Name" = join("-", [local.namespace, local.resource_name])
 
     "walrus.seal.io-catalog-name"     = "terraform-azure-mysql"
     "walrus.seal.io-project-id"       = local.project_id
@@ -28,7 +28,7 @@ locals {
 resource "azurerm_resource_group" "default" {
   count = var.infrastructure.resource_group == null ? 1 : 0
 
-  name     = local.name
+  name     = local.fullname
   location = "eastus"
 }
 
@@ -37,7 +37,7 @@ resource "azurerm_resource_group" "default" {
 resource "azurerm_virtual_network" "default" {
   count = var.infrastructure.virtual_network == null ? 1 : 0
 
-  name                = local.name
+  name                = local.fullname
   resource_group_name = data.azurerm_resource_group.selected.name
   location            = data.azurerm_resource_group.selected.location
   address_space       = ["10.0.0.0/16"]
@@ -48,7 +48,7 @@ resource "azurerm_virtual_network" "default" {
 resource "azurerm_subnet" "default" {
   count = var.infrastructure.subnet == null || var.infrastructure.virtual_network == null ? 1 : 0
 
-  name                 = local.name
+  name                 = local.fullname
   resource_group_name  = data.azurerm_resource_group.selected.name
   virtual_network_name = data.azurerm_virtual_network.selected.name
   address_prefixes     = ["10.0.1.0/24"]
@@ -166,6 +166,7 @@ resource "random_string" "name_suffix" {
 
 locals {
   name     = join("-", [local.resource_name, random_string.name_suffix.result])
+  fullname = format("walrus-%s", md5(join("-", [local.namespace, local.name])))
   version  = coalesce(var.engine_version, "8.0.21")
   database = coalesce(var.database, "mydb")
   username = coalesce(var.username, "rdsuser")
@@ -175,7 +176,7 @@ locals {
 }
 
 resource "azurerm_mysql_flexible_server" "primary" {
-  name = local.name
+  name = local.fullname
   tags = local.tags
 
   resource_group_name = data.azurerm_resource_group.selected.name
@@ -209,7 +210,7 @@ resource "azurerm_mysql_flexible_server" "primary" {
 resource "azurerm_mysql_flexible_server" "secondary" {
   count = local.architecture == "replication" ? local.replication_readonly_replicas : 0
 
-  name = join("-", [local.name, "secondary", tostring(count.index)])
+  name = join("-", [local.fullname, "secondary", tostring(count.index)])
   tags = local.tags
 
   resource_group_name = data.azurerm_resource_group.selected.name
